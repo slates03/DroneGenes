@@ -1,0 +1,92 @@
+---
+title: "09_Consensus_Data_Setup_WGCNA.rmd"
+author: "Garett Slater"
+date: "April 21 2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r knitr setup, include=FALSE,  eval=TRUE, echo=FALSE, warning=FALSE}
+library(knitr)
+knitr::opts_chunk$set(eval=TRUE, cache=FALSE, message=FALSE, warning=FALSE, 
+                      comment = "")
+```
+
+
+```{r data}
+library(WGCNA)
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+load(file = "T_datExpr.RData")
+load(file = "B_datExpr.RData")
+```
+
+
+```{r echo=FALSE}
+####################
+##Consensus
+####################
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+# We work with two sets:
+nSets = 2;
+
+# For easier labeling of plots, create a vector holding descriptive names of the two sets.
+setLabels = c("Testes TPMs", "Brain TPMs")
+shortLabels = c("Testes", "Brain")
+
+# Form multi-set expression data
+multiExpr = vector(mode = "list", length = nSets)
+
+# Testes
+multiExpr[[1]] = list(data = T_datExpr);
+colnames(multiExpr[[1]]$data) = colnames(T_datExpr)
+rownames(multiExpr[[1]]$data) = rownames(T_datExpr);
+
+# Brain
+multiExpr[[2]] = list(data = B_datExpr);
+colnames(multiExpr[[2]]$data) = colnames(B_datExpr)
+rownames(multiExpr[[2]]$data) = rownames(B_datExpr);
+
+# Check that the data has the correct format for many functions operating on multiple sets:
+exprSize = checkSets(multiExpr)
+
+
+sampleTrees = list()
+for (set in 1:nSets)
+{
+  sampleTrees[[set]] = hclust(dist(multiExpr[[set]]$data), method = "average")
+}
+
+png("SampleClustering_consensus.png", width = 4200, height = 3600, units = "px", pointsize = 22, bg = "white");
+par(mfrow=c(2,1))
+par(mar = c(6, 6, 6, 6))
+
+for (set in 1:nSets)
+  plot(sampleTrees[[set]], main = paste("Sample clustering on all genes in", setLabels[set]),
+       sub="", xlab="", cex.lab = 1.5, cex.axis = 1.5, cex.main = 2);
+dev.off();
+
+par(mfrow=c(2,1))
+for (set in 1:nSets)
+  plot(sampleTrees[[set]], main = paste("Sample clustering on all genes in", setLabels[set]),
+       sub="", xlab="", cex.lab = 1.5, cex.axis = 1.5, cex.main = 2)
+
+
+```
+
+```{r Saved Consensus}
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+# Check the size of the leftover data
+exprSize = checkSets(multiExpr)
+exprSize
+
+# Define data set dimensions
+nGenes = exprSize$nGenes;
+nSamples = exprSize$nSamples;
+
+save(multiExpr, nGenes, nSamples, setLabels, shortLabels, exprSize, 
+     file = "Consensus-dataInput.RData")
+```
+     
+     
+     

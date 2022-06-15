@@ -1,0 +1,254 @@
+---
+title: "08a-Testes-HubGenes_Expression.rmd"
+author: "Garett Slater"
+date: "April 21 2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r knitr setup, include=FALSE,  eval=TRUE, echo=FALSE, warning=FALSE}
+library(knitr)
+knitr::opts_chunk$set(eval=TRUE, cache=FALSE, message=FALSE, warning=FALSE, 
+                      comment = "")
+```
+
+
+```{r echo=FALSE}
+library(pacman)
+p_load(readxl,dplyr,tidyverse,lme4,fmsb,WGCNA,ggpubr)
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+load(file="T_datExpr.RData")
+load(file="T2_datExpr.RData")
+load(file="B_datExpr.RData")
+ID<-read_excel("~/OneDrive/Manuscripts/GenesOfDrones/Resources/Expression_Drone_Trait.xlsx",sheet="ID")
+Sperm<-read_excel("~/OneDrive/Manuscripts/GenesOfDrones/Resources/Expression_Drone_Trait.xlsx",sheet="Sperm")
+RFID_out<-read.csv("~/OneDrive/Manuscripts/GenesOfDrones/Resources/RFID_2020Final_out.csv")
+
+#Summarized Flight Trait data
+RFID_out<-merge(RFID_out,ID,by="UID")
+RFID_out$UTCTime_Final<- with(RFID_out, as.POSIXct(paste(UTCDate, UTCTime), format="%m/%d/%Y %H:%M:%OS"))
+var_out<-RFID_out %>% group_by(UID) %>% dplyr::summarise(N_flights=length(flight),mean_flight_timediff=mean(timediff)/60,first_flight_age=min(Drone_Age))
+```
+
+# Testes hub genes for Red and Turquoise Module
+
+Turquoise
+
+- GB53067
+- GB48172
+- GB54192
+- GB47284
+
+Black
+
+- GB55703
+- GB47009
+- GB52985
+- GB44588
+
+# Turquoise-GB42781
+```{r echo=FALSE}
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+x<-as.data.frame(T_datExpr)
+
+Hub1_Red<-dplyr::select(x,"GB42781")
+colnames(Hub1_Red)<-"GB"
+Hub1_Red$ID2<-rownames(Hub1_Red)
+Hub1_Red<-merge(SampleT,Hub1_Red,by="ID2")
+Hub1_Red$phen_age<-as.character(Hub1_Red$phen_age)
+
+#stats
+two.way <- aov(GB ~ phen_age, data = Hub1_Red)
+summary(two.way)
+TukeyHSD(two.way)
+
+ff<-Hub1_Red%>%group_by(phen_age,Line)%>% dplyr::summarise(mean=mean(GB),sd=sd(GB),N=length(GB),se=sd/sqrt(N))
+ff2<-Hub1_Red%>%group_by(phen_age)%>% dplyr::summarise(mean=mean(GB),sd=sd(GB),N=length(GB),se=sd/sqrt(N))
+ff$phen_age<-as.character(ff$phen_age)
+
+pdf(file = "Turquoise_HUBGene_GB42781.pdf", width = 12, height = 9);
+sp<-ggplot(data=ff, aes(x=phen_age, y=mean, group=Line)) +
+  geom_line(aes(color=Line),position=position_dodge(.2))+
+  geom_point(aes(color=Line),position=position_dodge(.2)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0,position=position_dodge(.2)) +
+  xlab("Age") +
+  ylab("fPKM") +
+  ggtitle("GB53067")+
+  scale_colour_hue(name="Tissue Type", l=40) + 
+  theme_classic() + theme(axis.ticks.x = element_blank(),
+                     axis.title.x = element_blank(),
+                     axis.text.x   = element_text(size=10, color="black"),
+                     axis.title.y  = element_text(face="bold", size=12),
+                     axis.text.y   = element_text(size=10, color="black"),
+                     legend.background = element_rect(size=0.5, linetype="solid",colour ="black"))
+
+sp2<-ggplot(data=ff2, aes(x=phen_age, y=mean,group=1)) +
+  geom_line()+
+  geom_point() +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0,position=position_dodge(.2)) +
+  xlab("Age") +
+  ylab("fPKM") +
+  ggtitle("GB53067")+
+  scale_colour_hue(name="Tissue Type", l=40) + 
+  theme_classic() + theme(axis.ticks.x = element_blank(),
+                     axis.title.x = element_blank(),
+                     axis.text.x   = element_text(size=10, color="black"),
+                     axis.title.y  = element_text(face="bold", size=12),
+                     axis.text.y   = element_text(size=10, color="black"),
+                     legend.background = element_rect(size=0.5, linetype="solid",colour ="black"))
+
+ggarrange(sp, sp2, ncol = 2, nrow = 1)
+dev.off()
+
+ggarrange(sp, sp2, ncol = 2, nrow = 1)
+```
+# Black-GB53067
+
+```{r echo=FALSE}
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+x<-as.data.frame(T_datExpr)
+
+Hub1_Red<-dplyr::select(x,"GB55703")
+colnames(Hub1_Red)<-"GB"
+Hub1_Red$ID2<-rownames(Hub1_Red)
+Hub1_Red<-merge(SampleT,Hub1_Red,by="ID2")
+Hub1_Red$phen_age<-as.character(Hub1_Red$phen_age)
+
+#states
+two.way <- aov(GB ~ phen_age, data = Hub1_Red)
+summary(two.way)
+TukeyHSD(two.way)
+
+ff<-Hub1_Red%>%group_by(phen_age,Line)%>% dplyr::summarise(mean=mean(GB),sd=sd(GB),N=length(GB),se=sd/sqrt(N))
+ff2<-Hub1_Red%>%group_by(phen_age)%>% dplyr::summarise(mean=mean(GB),sd=sd(GB),N=length(GB),se=sd/sqrt(N))
+ff$phen_age<-as.character(ff$phen_age)
+
+pdf(file = "Black_HUBGene_GB55703.pdf", width = 12, height = 9);
+sp<-ggplot(data=ff, aes(x=phen_age, y=mean, group=Line)) +
+  geom_line(aes(color=Line),position=position_dodge(.2))+
+  geom_point(aes(color=Line),position=position_dodge(.2)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0,position=position_dodge(.2)) +
+  xlab("Age") +
+  ylab("fPKM") +
+  ggtitle("GB55703")+
+  scale_colour_hue(name="Tissue Type", l=40) + 
+  theme_classic() + theme(axis.ticks.x = element_blank(),
+                     axis.title.x = element_blank(),
+                     axis.text.x   = element_text(size=10, color="black"),
+                     axis.title.y  = element_text(face="bold", size=12),
+                     axis.text.y   = element_text(size=10, color="black"),
+                     legend.background = element_rect(size=0.5, linetype="solid",colour ="black"))
+
+sp2<-ggplot(data=ff2, aes(x=phen_age, y=mean, group=1)) +
+  geom_line()+
+  geom_point() +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0,position=position_dodge(.2)) +
+  xlab("Age") +
+  ylab("fPKM") +
+  ggtitle("GB55703")+
+  scale_colour_hue(name="Tissue Type", l=40) + 
+  theme_classic() + theme(axis.ticks.x = element_blank(),
+                     axis.title.x = element_blank(),
+                     axis.text.x   = element_text(size=10, color="black"),
+                     axis.title.y  = element_text(face="bold", size=12),
+                     axis.text.y   = element_text(size=10, color="black"),
+                     legend.background = element_rect(size=0.5, linetype="solid",colour ="black"))
+
+ggarrange(sp, sp2, ncol = 2, nrow = 1)
+dev.off()
+ggarrange(sp, sp2, ncol = 2, nrow = 1)
+```
+
+
+
+#  Sperm senesence Graphic for figures
+```{r echo=FALSE}
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+sperm_1<-merge(Sperm,ID)
+sperm_1$phen_age<-as.character(sperm_1$phen_age)
+#stats
+two.way <- aov(Sperm_Conc_2 ~ phen_age, data = sperm_1)
+summary(two.way)
+TukeyHSD(two.way)
+
+
+ff<-sperm_1%>%group_by(phen_age,Line)%>% dplyr::summarise(mean=mean(Sperm_viability),sd=sd(Sperm_viability),N=length(Sperm_viability),se=sd/sqrt(N))
+ff$phen_age<-as.character(ff$phen_age)
+
+ff1<-sperm_1%>%group_by(phen_age)%>% dplyr::summarise(mean=mean(Sperm_viability),sd=sd(Sperm_viability),N=length(Sperm_viability),se=sd/sqrt(N))
+ff1$phen_age<-as.character(ff1$phen_age)
+
+ff2<-sperm_1%>%group_by(phen_age,Line)%>% dplyr::summarise(mean=mean(Sperm_Conc_2),sd=sd(Sperm_Conc_2),N=length(Sperm_Conc_2),se=sd/sqrt(N))
+ff2$phen_age<-as.character(ff2$phen_age)
+
+ff3<-sperm_1%>%group_by(phen_age)%>% dplyr::summarise(mean=mean(Sperm_Conc_2),sd=sd(Sperm_Conc_2),N=length(Sperm_Conc_2),se=sd/sqrt(N))
+ff3$phen_age<-as.character(ff3$phen_age)
+
+
+pdf(file = "SpermTrait_Senescence.pdf", width = 12, height = 9);
+sp<-ggplot(data=ff, aes(x=phen_age, y=mean, group=Line)) +
+  geom_line(aes(color=Line),position=position_dodge(.2))+
+  geom_point(aes(color=Line),position=position_dodge(.2)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0,position=position_dodge(.2)) +
+  xlab("Age") +
+  ylab("Sperm Viability (%)") +
+  ggtitle("Sperm Viability")+
+  scale_colour_hue(name="Tissue Type", l=40) + 
+  theme_classic() + theme(axis.ticks.x = element_blank(),
+                     axis.title.x = element_blank(),
+                     axis.text.x   = element_text(size=10, color="black"),
+                     axis.title.y  = element_text(face="bold", size=12),
+                     axis.text.y   = element_text(size=10, color="black"),
+                     legend.background = element_rect(size=0.5, linetype="solid",colour ="black"))
+
+sp1<-ggplot(data=ff1, aes(x=phen_age, y=mean, group=1)) +
+  geom_line()+
+  geom_point() +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0,position=position_dodge(.2)) +
+  xlab("Age") +
+  ylab("Sperm Viability (%)") +
+  ggtitle("Sperm Viability")+
+  scale_colour_hue(name="Tissue Type", l=40) + 
+  theme_classic() + theme(axis.ticks.x = element_blank(),
+                     axis.title.x = element_blank(),
+                     axis.text.x   = element_text(size=10, color="black"),
+                     axis.title.y  = element_text(face="bold", size=12),
+                     axis.text.y   = element_text(size=10, color="black"),
+                     legend.background = element_rect(size=0.5, linetype="solid",colour ="black"))
+
+sp2<-ggplot(data=ff2, aes(x=phen_age, y=mean, group=Line)) +
+  geom_line(aes(color=Line),position=position_dodge(.2))+
+  geom_point(aes(color=Line),position=position_dodge(.2)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0,position=position_dodge(.2)) +
+  xlab("Age") +
+  ylab("Sperm Concentration (10^6)") +
+  ggtitle("Sperm Concentration")+
+  scale_colour_hue(name="Tissue Type", l=40) + 
+  theme_classic() + theme(axis.ticks.x = element_blank(),
+                     axis.title.x = element_blank(),
+                     axis.text.x   = element_text(size=10, color="black"),
+                     axis.title.y  = element_text(face="bold", size=12),
+                     axis.text.y   = element_text(size=10, color="black"),
+                     legend.background = element_rect(size=0.5, linetype="solid",colour ="black"))
+
+sp3<-ggplot(data=ff3, aes(x=phen_age, y=mean, group=1)) +
+  geom_line()+
+  geom_point() +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0,position=position_dodge(.2)) +
+  xlab("Age") +
+  ylab("Sperm Concentration (10^6)") +
+  ggtitle("Sperm Concentration")+
+  scale_colour_hue(name="Tissue Type", l=40) + 
+  theme_classic() + theme(axis.ticks.x = element_blank(),
+                     axis.title.x = element_blank(),
+                     axis.text.x   = element_text(size=10, color="black"),
+                     axis.title.y  = element_text(face="bold", size=12),
+                     axis.text.y   = element_text(size=10, color="black"),
+                     legend.background = element_rect(size=0.5, linetype="solid",colour ="black"))
+ggarrange(sp, sp1,sp2,sp3, ncol = 2, nrow = 2)
+dev.off()
+ggarrange(sp, sp1,sp2,sp3, ncol = 2, nrow = 2)
+```
+
+

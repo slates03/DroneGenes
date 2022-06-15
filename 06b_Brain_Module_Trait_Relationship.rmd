@@ -1,0 +1,370 @@
+---
+title: "05b_Brain_Module_Trait_Relationship.rmd"
+author: "Garett Slater"
+date: "April 21 2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# Module and Trait Relationship
+I looked the relationship between testes gene clusters and important sperm traits, i.e. sperm concentration and sperm viability.
+
+
+```{r knitr setup, include=FALSE,  eval=TRUE, echo=FALSE, warning=FALSE}
+library(knitr)
+knitr::opts_chunk$set(eval=TRUE, cache=FALSE, message=FALSE, warning=FALSE, 
+                      comment = "")
+```
+
+
+```{r echo=FALSE}
+library(pacman)
+p_load(readxl,dplyr,tidyverse,lme4,fmsb,WGCNA)
+
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+load(file="Brain-networkConstruction-auto.RData")
+load(file="B_datExpr.RData")
+load(file="T_datExpr.RData")
+Sperm<-read_excel("~/OneDrive/Manuscripts/GenesOfDrones/Resources/Expression_Drone_Trait.xlsx",sheet="Sperm")
+ID<-read_excel("~/OneDrive/Manuscripts/GenesOfDrones/Resources/Expression_Drone_Trait.xlsx",sheet="ID")
+Weight<-read_excel("~/OneDrive/Manuscripts/GenesOfDrones/Resources/Expression_Drone_Trait.xlsx",sheet="Weight")
+Morpho<-read_excel("~/OneDrive/Manuscripts/GenesOfDrones/Resources/Expression_Drone_Trait.xlsx",sheet="Morpho")
+RFID_out<-read.csv("~/OneDrive/Manuscripts/GenesOfDrones/Resources/RFID_2020Final_out.csv")
+
+#Flight Traits
+RFID_out<-merge(RFID_out,ID,by="UID")
+RFID_out$UTCTime_Final<- with(RFID_out, as.POSIXct(paste(UTCDate, UTCTime), format="%m/%d/%Y %H:%M:%OS"))
+var_out<-RFID_out %>% group_by(UID) %>% dplyr::summarise(N_flights=length(flight),mean_flight_timediff=mean(timediff)/60,first_flight_age=min(Drone_Age))
+```
+
+# Brain Heatmap and Sperm Traits
+
+```{r Sperm}
+# Define numbers of genes and samples
+nGenes = ncol(B_datExpr);
+nSamples = nrow(B_datExpr);
+# Recalculate MEs with color labels
+MEs0 = moduleEigengenes(B_datExpr, B_moduleColors)$eigengenes
+MEs = orderMEs(MEs0)
+
+#Filter Sperm
+samp_id<-data.frame(SampleB[,3]);colnames(samp_id)<-"ID2"
+Sperm_1<-merge(Sperm,SampleB)
+Sperm_1<-dplyr::select(Sperm_1,"ID2","Line","Sperm_Conc_2","Sperm_viability")
+Sperm_1<-Sperm_1[!duplicated(Sperm_1$ID2),]
+
+#Filter Modules based on sperm traits
+MEs$ID2<-rownames(MEs)
+MEs<- filter(MEs, MEs$ID2 %in% Sperm_1$ID2)
+MEs<-MEs[!duplicated(MEs$ID2),]
+MEs<-MEs[,-20]
+sp_MEs<-MEs
+
+moduleTraitCor = cor(MEs, Sperm_1[,c(3,4)], use = "p");
+moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nSamples);
+write.csv(moduleTraitCor,"moduleTraitCor_B_sperm")
+write.csv(moduleTraitPvalue,"moduleTraitPvalue_B_sperm")
+```
+
+```{r echo=FALSE}
+########################################
+##              HeatMap               ## 
+########################################
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+# Will display correlations and their p-values
+textMatrix = paste(signif(moduleTraitCor, 2), "\n(",
+                   signif(moduleTraitPvalue, 1), ")", sep = "");
+dim(textMatrix) = dim(moduleTraitCor)
+par(mar = c(6, 8.5, 3, 3));
+# Display the correlation values within a heatmap plot
+labeledHeatmap(Matrix = moduleTraitCor,
+               xLabels = names(Sperm_1[,c(3,4)]),
+               yLabels = names(MEs),
+               ySymbols = names(MEs),
+               colorLabels = FALSE,
+               colors = blueWhiteRed(50),
+               textMatrix = textMatrix,
+               setStdMargins = FALSE,
+               cex.text = 0.5,
+               zlim = c(-1,1),
+               main = paste("Module-trait relationships"))
+
+pdf(file = "Brain_Trait_Correlation_Sperm.pdf", width = 12, height = 9);
+par(mar = c(6, 8.5, 3, 3));
+# Display the correlation values within a heatmap plot
+labeledHeatmap(Matrix = moduleTraitCor,
+               xLabels = names(Sperm_1[,c(3,4)]),
+               yLabels = names(MEs),
+               ySymbols = names(MEs),
+               colorLabels = FALSE,
+               colors = blueWhiteRed(50),
+               textMatrix = textMatrix,
+               setStdMargins = FALSE,
+               cex.text = 0.5,
+               zlim = c(-1,1),
+               main = paste("Module-trait relationships"))
+dev.off()
+```
+
+
+# Brain Heatmap and Flight Traits
+
+```{r Flight}
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+# Define numbers of genes and samples
+nGenes = ncol(B_datExpr);
+nSamples = nrow(B_datExpr);
+# Recalculate MEs with color labels
+MEs0 = moduleEigengenes(B_datExpr, B_moduleColors)$eigengenes
+MEs = orderMEs(MEs0)
+
+#Filter Flight
+samp_id<-data.frame(SampleB[,3]);colnames(samp_id)<-"ID2"
+flight<-merge(var_out,ID)
+flight_1<-merge(flight,SampleB)
+flight_1<-dplyr::select(flight_1,"ID2","Line","mean_flight_timediff","N_flights","first_flight_age")
+flight_1<-flight_1[!duplicated(flight_1$ID2),]
+
+#Filter Modules based on sperm traits
+MEs$ID2<-rownames(MEs)
+MEs<- filter(MEs, MEs$ID2 %in% flight_1$ID2)
+MEs<-MEs[,-20]
+fl_MEs<-MEs
+
+moduleTraitCor = cor(MEs, flight_1[,c(3,4,5)], use = "p")
+moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nSamples);
+write.csv(moduleTraitCor,"moduleTraitCor_B_flight")
+write.csv(moduleTraitPvalue,"moduleTraitPvalue_B_flight")
+```
+
+```{r echo=FALSE}
+########################################
+##              HeatMap               ## 
+########################################
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+# Will display correlations and their p-values
+textMatrix = paste(signif(moduleTraitCor, 2), "\n(",
+                   signif(moduleTraitPvalue, 1), ")", sep = "");
+dim(textMatrix) = dim(moduleTraitCor)
+par(mar = c(6, 8.5, 3, 3));
+# Display the correlation values within a heatmap plot
+labeledHeatmap(Matrix = moduleTraitCor,
+               xLabels = names(flight_1[,c(3,4,5)]),
+               yLabels = names(MEs),
+               ySymbols = names(MEs),
+               colorLabels = FALSE,
+               colors = blueWhiteRed(50),
+               textMatrix = textMatrix,
+               setStdMargins = FALSE,
+               cex.text = 0.5,
+               zlim = c(-1,1),
+               main = paste("Module-trait relationships"))
+
+pdf(file = "Brain_Trait_Correlation_FlightTraits.pdf", width = 12, height = 9);
+par(mar = c(6, 8.5, 3, 3));
+# Display the correlation values within a heatmap plot
+labeledHeatmap(Matrix = moduleTraitCor,
+               xLabels = names(flight_1[,c(3,4,5)]),
+               yLabels = names(MEs),
+               ySymbols = names(MEs),
+               colorLabels = FALSE,
+               colors = blueWhiteRed(50),
+               textMatrix = textMatrix,
+               setStdMargins = FALSE,
+               cex.text = 0.5,
+               zlim = c(-1,1),
+               main = paste("Module-trait relationships"))
+dev.off()
+
+```
+
+# Brain Heatmap and morphology Traits
+
+```{r Morphology}
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+# Define numbers of genes and samples
+nGenes = ncol(B_datExpr);
+nSamples = nrow(B_datExpr);
+# Recalculate MEs with color labels
+MEs0 = moduleEigengenes(B_datExpr, B_moduleColors)$eigengenes
+MEs = orderMEs(MEs0)
+
+#Filter morpho
+samp_id<-data.frame(SampleB[,3]);colnames(samp_id)<-"ID2"
+morpho<-merge(Morpho,ID)
+morpho_1<-merge(morpho,SampleB)
+morpho_1<-merge(morpho_1,Weight)
+morpho_1<-dplyr::select(morpho_1,"ID2","Line","Maturity","Weight","frontwing_width","head_width")
+morpho_1$Maturity<-as.numeric(c("NM" = "0", "M" = "1")[morpho_1$Maturity])
+morpho_1<-morpho_1[!duplicated(morpho_1$ID2),]
+
+#Filter Modules based on sperm traits
+MEs$ID2<-rownames(MEs)
+MEs<- filter(MEs, MEs$ID2 %in% morpho_1$ID2)
+MEs<-MEs[,-20]
+mor_MEs<-MEs
+
+moduleTraitCor = cor(MEs, morpho_1[,c(3,4,5,6)], use = "p")
+moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nSamples);
+write.csv(moduleTraitCor,"moduleTraitCor_B_morpho")
+write.csv(moduleTraitPvalue,"moduleTraitPvalue_B_morpho")
+```
+
+```{r echo=FALSE}
+########################################
+##              HeatMap               ## 
+########################################
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+# Will display correlations and their p-values
+textMatrix = paste(signif(moduleTraitCor, 2), "\n(",
+                   signif(moduleTraitPvalue, 1), ")", sep = "");
+dim(textMatrix) = dim(moduleTraitCor)
+par(mar = c(6, 8.5, 3, 3));
+# Display the correlation values within a heatmap plot
+labeledHeatmap(Matrix = moduleTraitCor,
+               xLabels = names(morpho_1[,c(3,4,5,6)]),
+               yLabels = names(MEs),
+               ySymbols = names(MEs),
+               colorLabels = FALSE,
+               colors = blueWhiteRed(50),
+               textMatrix = textMatrix,
+               setStdMargins = FALSE,
+               cex.text = 0.5,
+               zlim = c(-1,1),
+               main = paste("Module-trait relationships"))
+
+pdf(file = "Brain_Trait_Correlation_MorphoTraits.pdf", width = 12, height = 9);
+par(mar = c(6, 8.5, 3, 3));
+# Display the correlation values within a heatmap plot
+labeledHeatmap(Matrix = moduleTraitCor,
+               xLabels = names(morpho_1[,c(3,4,5,6)]),
+               yLabels = names(MEs),
+               ySymbols = names(MEs),
+               colorLabels = FALSE,
+               colors = blueWhiteRed(50),
+               textMatrix = textMatrix,
+               setStdMargins = FALSE,
+               cex.text = 0.5,
+               zlim = c(-1,1),
+               main = paste("Module-trait relationships"))
+dev.off()
+
+```
+
+
+
+
+
+# Number of flights
+None of the clusters were significant. I did plot Blue because it was significant for first flight age
+
+```{r echo=FALSE}
+########################################
+##             N_flights              ## 
+########################################
+
+# Define variable weight containing the weight column of datTrait
+N_flights = as.data.frame(SampleB$N_flights);
+names(N_flights) = "N_flights"
+# names (colors) of the modules
+modNames = substring(names(MEs), 3)
+geneModuleMembership = as.data.frame(cor(B_datExpr, B_MEs, use = "p"));
+MMPvalue = as.data.frame(corPvalueStudent(as.matrix(geneModuleMembership), nSamples));
+
+names(geneModuleMembership) = paste("MM", modNames, sep="");
+names(MMPvalue) = paste("p.MM", modNames, sep="");
+geneTraitSignificance = as.data.frame(cor(B_datExpr, N_flights, use = "p"));
+GSPvalue = as.data.frame(corPvalueStudent(as.matrix(geneTraitSignificance), nSamples));
+names(geneTraitSignificance) = paste("GS.", names(N_flights), sep="");
+names(GSPvalue) = paste("p.GS.", names(N_flights), sep="");
+
+
+#Blue Cluster
+module = "blue"
+column = match(module, modNames);
+moduleGenes = B_moduleColors==module;
+par(mfrow = c(1,1));
+verboseScatterplot(abs(geneModuleMembership[moduleGenes, column]),
+                   abs(geneTraitSignificance[moduleGenes, 1]),
+                   xlab = paste("Module Membership in", module, "module"),
+                   ylab = "Gene significance for body weight",
+                   main = paste("Module membership vs. gene significance\n"),
+                   cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
+```
+
+
+# Flight Duration
+None of the clusters were significant. I did plot Blue because it was significant for first flight age
+```{r echo=FALSE}
+
+########################################
+##            Mean Flights          ## 
+########################################
+
+# Define variable weight containing the weight column of datTrait
+mean_flight = as.data.frame(SampleB$mean_flight_timediff)
+names(mean_flight) = "mean_flight"
+# names (colors) of the modules
+modNames = substring(names(MEs), 3)
+geneModuleMembership = as.data.frame(cor(B_datExpr, B_MEs, use = "p"));
+MMPvalue = as.data.frame(corPvalueStudent(as.matrix(geneModuleMembership), nSamples));
+
+names(geneModuleMembership) = paste("MM", modNames, sep="");
+names(MMPvalue) = paste("p.MM", modNames, sep="");
+geneTraitSignificance = as.data.frame(cor(B_datExpr, mean_flight, use = "p"));
+GSPvalue = as.data.frame(corPvalueStudent(as.matrix(geneTraitSignificance), nSamples));
+names(geneTraitSignificance) = paste("GS.", names(mean_flight), sep="");
+names(GSPvalue) = paste("p.GS.", names(mean_flight), sep="");
+
+#Blue Cluster
+module = "blue"
+column = match(module, modNames);
+moduleGenes = B_moduleColors==module;
+par(mfrow = c(1,1));
+verboseScatterplot(abs(geneModuleMembership[moduleGenes, column]),
+                   abs(geneTraitSignificance[moduleGenes, 1]),
+                   xlab = paste("Module Membership in", module, "module"),
+                   ylab = "Gene significance for body weight",
+                   main = paste("Module membership vs. gene significance\n"),
+                   cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
+```
+
+
+# First Flight Age
+None of the clusters were significant. I did plot Blue because it was significant for first flight age
+```{r echo=FALSE}
+########################################
+##            Flight Age         ## 
+########################################
+
+# Define variable weight containing the weight column of datTrait
+flight_age = as.data.frame(SampleB$first_flight_age)
+names(flight_age) = "flight_age"
+# names (colors) of the modules
+modNames = substring(names(MEs), 3)
+geneModuleMembership = as.data.frame(cor(B_datExpr, B_MEs, use = "p"));
+MMPvalue = as.data.frame(corPvalueStudent(as.matrix(geneModuleMembership), nSamples));
+
+names(geneModuleMembership) = paste("MM", modNames, sep="");
+names(MMPvalue) = paste("p.MM", modNames, sep="");
+geneTraitSignificance = as.data.frame(cor(B_datExpr, flight_age, use = "p"));
+GSPvalue = as.data.frame(corPvalueStudent(as.matrix(geneTraitSignificance), nSamples));
+names(geneTraitSignificance) = paste("GS.", names(flight_age), sep="");
+names(GSPvalue) = paste("p.GS.", names(flight_age), sep="");
+
+#Blue Cluster
+module = "blue"
+column = match(module, modNames);
+moduleGenes = B_moduleColors==module;
+par(mfrow = c(1,1));
+verboseScatterplot(abs(geneModuleMembership[moduleGenes, column]),
+                   abs(geneTraitSignificance[moduleGenes, 1]),
+                   xlab = paste("Module Membership in", module, "module"),
+                   ylab = "Gene significance for body weight",
+                   main = paste("Module membership vs. gene significance\n"),
+                   cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
+```
+
+
+

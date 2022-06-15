@@ -1,0 +1,150 @@
+---
+title: "00-RFID_Flight_Processing.md"
+author: "Garett Slater"
+date: "April 21 2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r knitr setup, include=FALSE,  eval=TRUE, echo=FALSE, warning=FALSE}
+library(knitr)
+knitr::opts_chunk$set(eval=TRUE, cache=FALSE, message=FALSE, warning=FALSE, 
+                      comment = "")
+```
+
+```{r data}
+
+# Display the current working directory
+getwd();
+
+library(pacman)
+p_load(readxl,dplyr,tidyverse,lme4)
+```
+
+# RFID Flight Processing Function (Using Microsensy)
+```{r echo=FALSE}
+#Functions
+#Number of Readers and structure of return flights 
+##
+##RFID Analysis
+##Requirements...
+##
+## df=Dataframe. In this case, RFID is the dataframe
+## UID=RFID ID. These are the unique codes for each bee
+## UTCDate=RFID Date Marker. This is just the Date, not the time. I seperated this in excel, but another code would work
+## UTCTime_Full=This is the full date with the time. This needs to be formatted correctly. 
+## 
+
+RFID_function = function(df){
+bees = as.character(unique(df$UID))
+mung.df = c()
+
+  for(bee in bees){ ##Creating a loop for each variable in dataframe "bees"
+    #
+    test = df[which(df$UID==bee), ]
+    Dates = as.character(unique(test$UTCDate)) ##creating a list of unique dates
+    #low number of rows will cause failure
+    for(Date in Dates){  ##creating a loop for each variable in dataframe "Dates"
+      #
+      date.df=test[which(test$UTCDate==Date), ]
+      ad=date.df$Address;ad=c(ad, 0) ##creating directionality -- new list of all the column Address plus a zero at the end
+      ad1=date.df$Address; ad1=c(0, ad1) ##creating directionality -- new list of all the column Address plus a zero at the beginning
+      ad=paste(ad1, ad, sep="-") ##pasting the two lists together
+      
+      ax=date.df$UTCTime_Final; ax=c(ax,ax[length(ax)]) ##listing all the times plus an entery that equals the last time
+      ax1=date.df$UTCTime_Final; ax1=c(ax1[1], ax1) ##listing all the times plus an entery that equals the fist time
+      ax=as.numeric(difftime(ax, ax1, unit="sec")) ##subtracting the two lists and getting output as numeric in seconds
+      
+      ax = ax[-1] #removing last row
+      ad=ad[-1] #removing last row
+      date.df$timediff = ax ##adding the time difference column to dataframe
+      date.df$dir = ad ##adding the directionality column to dataframe
+      
+      mung.df = rbind(date.df,mung.df) ##merging the to dateframes without repeats
+      
+    }
+  }
+return(mung.df)
+}
+
+##Add out versus in directionality
+##Requirements...
+##
+## df=Dataframe. In this case, RFID is the dataframe
+## UID=RFID ID. These are the unique codes for each bee
+## UTCDate=RFID Date Marker. This is just the Date, not the time. I seperated this in excel, but another code would work
+## UTCTime_Full=This is the full date with the time. This needs to be formatted correctly. 
+## 
+
+RFID_dir_function = function(df){
+  bees = as.character(unique(df$UID))
+  mung.df = c()
+  
+  for(bee in bees){ ##Creating a loop for each variable in dataframe "bees"
+    #
+    test = df[which(df$UID==bee), ]
+    Dates = as.character(unique(test$UTCDate)) ##creating a list of unique dates
+    #low number of rows will cause failure
+    for(Date in Dates){  ##creating a loop for each variable in dataframe "Dates"
+      #
+      date.df=test[which(test$UTCDate==Date), ]
+      date.df$flight<-seq(from = 1, to = nrow(date.df))
+      
+      mung.df = rbind(date.df,mung.df) ##merging the to dateframes without repeats
+      
+    }
+  }
+  return(mung.df)
+}
+```
+
+
+```{r echo=FALSE}
+#Produce UID File 
+#Combine UID Files
+setwd("~/OneDrive/Manuscripts/GenesOfDrones/Phenotyping/RFID/2020 RFID/UID")
+RF = list.files("~/OneDrive/Manuscripts/GenesOfDrones/Phenotyping/RFID/2020 RFID/UID") ## I just didn't want to change it in the code 
+tables <- lapply(RF, read.csv, header = TRUE)
+comb.df <- do.call(rbind , tables)
+write.csv(comb.df,"~/OneDrive/Manuscripts/GenesOfDrones/Resources/comb_UID.csv")
+
+#Produce Final RFID File
+
+#convert columns to time, date, etc ---------------
+RFID<-read.csv("~/OneDrive/Manuscripts/GenesOfDrones/Resources/comb_RFID_2.csv")
+#Reformat Date/Time
+RFID$UTCTime_Final <- with(RFID, as.POSIXct(paste(UTCDate, UTCTime), format="%m/%d/%Y %H:%M:%OS"))
+
+## order by date and time
+RFID = RFID[with(RFID, order(RFID$UID,RFID$UTCTime_Final)),]
+
+
+############################################################################
+#Run RFID Code
+############################################################################
+## Run RFID Function. More explanation is in the functions tab.
+RFID<-RFID_function(df=RFID)
+write.csv(RFID,"~/OneDrive/Manuscripts/GenesOfDrones/Resources/RFID_2020Final.csv")
+RFID<-read.csv("~/OneDrive/Manuscripts/GenesOfDrones/Resources/RFID_2020Final.csv")
+
+############################################################################
+#Date set-up RFID
+############################################################################
+##Filter anything under 1 minute
+RFID_1<-RFID[which(RFID$timediff>2),]
+
+#Add outside versus inside
+RFID_1<-RFID_dir_function(RFID_1)
+
+#Out versus In
+RFID_out<-RFID_1 %>% filter(flight %% 2 == 1)
+RFID_in<-RFID_1 %>% filter(flight %% 2 != 1)
+
+write.csv(RFID_out,"~/OneDrive/Manuscripts/GenesOfDrones/Resources/RFID_2020Final_out.csv")
+write.csv(RFID_in,"~/OneDrive/Manuscripts/GenesOfDrones/Resources/RFID_2020Final_in.csv")
+RFID_out<-read.csv("~/OneDrive/Manuscripts/GenesOfDrones/Resources/RFID_2020Final_out.csv")
+RFID_out
+```
+
+

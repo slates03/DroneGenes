@@ -1,0 +1,225 @@
+---
+title: "11_Consensus_Trait_Correlation.rmd"
+author: "Garett Slater"
+date: "April 21 2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+```{r knitr setup, include=FALSE,  eval=TRUE, echo=FALSE, warning=FALSE}
+library(knitr)
+knitr::opts_chunk$set(eval=TRUE, cache=FALSE, message=FALSE, warning=FALSE,
+                      comment = "")
+```
+
+
+```{r data}
+library(WGCNA)
+library(cluster)
+library(dplyr)
+library(readxl)
+
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+Sample<-read_excel("~/OneDrive/Manuscripts/GenesOfDrones/Resources/Expression_Drone_Trait.xlsx",sheet="Sample")
+load(file = "Consensus-dataInput.RData")
+load(file = "Consensus-NetworkConstruction-auto.RData")
+load(file = "B_datExpr.RData")
+load(file = "T_datExpr.RData")
+load(file = "Consensus-NetworkConstruction-auto.RData")
+load(file = "Testes-networkConstruction-auto.RData")
+load(file = "Brain-networkConstruction-auto.RData")
+```
+
+
+```{r echo=FALSE}
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+# Isolate the module labels in the order they appear in ordered module eigengenes
+T_ModuleLabels = substring(names(T_MEs), 3)
+consModuleLabels = substring(names(consMEs[[1]]$data), 3)
+# Convert the numeric module labels to color labels
+T_Modules = labels2colors(as.numeric(T_ModuleLabels))
+consModules = labels2colors(as.numeric(consModuleLabels))
+# Numbers of female and consensus modules
+nTMods = length(T_Modules)
+nConsMods = length(consModules)
+# Initialize tables of p-values and of the corresponding counts
+pTable = matrix(0, nrow = nTMods, ncol = nConsMods);
+CountTbl = matrix(0, nrow = nTMods, ncol = nConsMods);
+# Execute all pairwaise comparisons
+for (fmod in 1:nTMods)
+  for (cmod in 1:nConsMods)
+  {
+    T_Members = (T_moduleColors == T_Modules[fmod]);
+    consMembers = (moduleColors == consModules[cmod]);
+    pTable[fmod, cmod] = -log10(fisher.test(T_Members, consMembers, alternative = "greater")$p.value);
+    CountTbl[fmod, cmod] = sum(T_moduleColors == T_Modules[fmod] & moduleColors ==
+                                 consModules[cmod])
+  }
+
+# Truncate p values smaller than 10^{-50} to 10^{-50}
+pTable[is.infinite(pTable)] = 1.3*max(pTable[is.finite(pTable)]);
+pTable[pTable>50 ] = 50 ;
+# Marginal counts (really module sizes)
+T_ModTotals = apply(CountTbl, 1, sum)
+consModTotals = apply(CountTbl, 2, sum)
+# Actual plotting
+sizeGrWindow(10,7 );
+pdf(file = "ConsensusVsFemaleModules.pdf", wi = 10, he = 7);
+par(mfrow=c(1,1));
+par(cex = 1.0);
+par(mar=c(8, 10.4, 2.7, 1)+0.3);
+# Use function labeledHeatmap to produce the color-coded table with all the trimmings
+labeledHeatmap(Matrix = pTable,
+               xLabels = paste(" ", consModules),
+               yLabels = paste(" ", T_Modules),
+               colorLabels = TRUE,
+               xSymbols = paste("Cons ", consModules, ": ", consModTotals, sep=""),
+               ySymbols = paste("Testes ", T_Modules, ": ", T_ModTotals, sep=""),
+               textMatrix = CountTbl,
+               colors = greenWhiteRed(100)[50:100],
+               main = "Correspondence of Female set-specific and Female-Male consensus modules",
+               cex.text = 1.0, cex.lab = 1.0, setStdMargins = FALSE);
+dev.off();
+
+par(mfrow=c(1,1));
+par(cex = 1.0);
+par(mar=c(8, 10.4, 2.7, 1)+0.3);
+# Use function labeledHeatmap to produce the color-coded table with all the trimmings
+labeledHeatmap(Matrix = pTable,
+               xLabels = paste(" ", consModules),
+               yLabels = paste(" ", T_Modules),
+               colorLabels = TRUE,
+               xSymbols = paste("Cons ", consModules, ": ", consModTotals, sep=""),
+               ySymbols = paste("Testes ", T_Modules, ": ", T_ModTotals, sep=""),
+               textMatrix = CountTbl,
+               colors = greenWhiteRed(100)[50:100],
+               main = "Correspondence of Female set-specific and Female-Male consensus modules",
+               cex.text = 1.0, cex.lab = 1.0, setStdMargins = FALSE);
+```
+
+
+
+
+```{r echo=FALSE}
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+#Traits with multiple tissues sequenced
+list<-inner_join(SampleB, SampleT,by="ID") %>%select(ID)
+SampleT2<-merge(SampleT,list,by="ID")
+SampleB2<-merge(SampleB,list,by="ID")
+
+Traits = vector(mode = "list", length = nSets)
+Traits[[1]]<-SampleT2
+Traits[[2]]<-SampleB2
+
+# Set up variables to contain the module-trait correlations
+nSets=2
+moduleTraitCor = list();
+moduleTraitPvalue = list();
+# Calculate the correlations
+for (set in 1:nSets)
+{
+  moduleTraitCor[[set]] = cor(consMEs[[set]]$data, Traits[[set]]$data, use = "p");
+  moduleTraitPvalue[[set]] = corPvalueFisher(moduleTraitCor[[set]], exprSize$nSamples[set]);
+}
+
+# Convert numerical lables to colors for labeling of modules in the plot
+MEColors = labels2colors(as.numeric(substring(names(consMEs[[1]]$data), 3)));
+MEColorNames = paste("ME", MEColors, sep="");
+# Open a suitably sized window (the user should change the window size if necessary)
+sizeGrWindow(10,7)
+#pdf(file = "Plots/ModuleTraitRelationships-female.pdf", wi = 10, he = 7);
+# Plot the module-trait relationship table for set number 1
+set = 1
+textMatrix = paste(signif(moduleTraitCor[[set]], 2), "\n(",
+                   signif(moduleTraitPvalue[[set]], 1), ")", sep = "");
+dim(textMatrix) = dim(moduleTraitCor[[set]])
+par(mar = c(6, 8.8, 3, 2.2));
+labeledHeatmap(Matrix = moduleTraitCor[[set]],
+               xLabels = names(Traits[[set]]$data),
+               yLabels = MEColorNames,
+               ySymbols = MEColorNames,
+               colorLabels = FALSE,
+               colors = greenWhiteRed(50),
+               textMatrix = textMatrix,
+               setStdMargins = FALSE,
+               cex.text = 0.5,
+               zlim = c(-1,1),
+               main = paste("Module--trait relationships in", setLabels[set]))
+dev.off();
+par(mar = c(6, 8.8, 3, 2.2));
+labeledHeatmap(Matrix = moduleTraitCor[[set]],
+               xLabels = names(Traits[[set]]$data),
+               yLabels = MEColorNames,
+               ySymbols = MEColorNames,
+               colorLabels = FALSE,
+               colors = greenWhiteRed(50),
+               textMatrix = textMatrix,
+               setStdMargins = FALSE,
+               cex.text = 0.5,
+               zlim = c(-1,1),
+               main = paste("Module--trait relationships in", setLabels[set]))
+```
+
+```{r echo=FALSE}
+# Plot the module-trait relationship table for set number 2
+set = 2
+textMatrix = paste(signif(moduleTraitCor[[set]], 2), "\n(",
+                   signif(moduleTraitPvalue[[set]], 1), ")", sep = "");
+dim(textMatrix) = dim(moduleTraitCor[[set]])
+sizeGrWindow(10,7)
+pdf(file = "ModuleTraitRelationships-male.pdf", wi = 10, he = 7);
+par(mar = c(6, 8.8, 3, 2.2));
+
+
+labeledHeatmap(Matrix = moduleTraitCor[[set]],
+               xLabels = names(Traits[[set]]$data),
+               yLabels = MEColorNames,
+               ySymbols = MEColorNames,
+               colorLabels = FALSE,
+               colors = greenWhiteRed(50),
+               textMatrix = textMatrix,
+               setStdMargins = FALSE,
+               cex.text = 0.5,
+               zlim = c(-1,1),
+               main = paste("Module--trait relationships in", setLabels[set]))
+dev.off();
+
+# Initialize matrices to hold the consensus correlation and p-value
+consensusCor = matrix(NA, nrow(moduleTraitCor[[1]]), ncol(moduleTraitCor[[1]]));
+consensusPvalue = matrix(NA, nrow(moduleTraitCor[[1]]), ncol(moduleTraitCor[[1]]));
+
+# Find consensus negative correlations
+negative = moduleTraitCor[[1]] < 0 & moduleTraitCor[[2]] < 0;
+consensusCor[negative] = pmax(moduleTraitCor[[1]][negative], moduleTraitCor[[2]][negative]);
+consensusPvalue[negative] = pmax(moduleTraitPvalue[[1]][negative], moduleTraitPvalue[[2]][negative]);
+
+# Find consensus positive correlations
+positive = moduleTraitCor[[1]] > 0 & moduleTraitCor[[2]] > 0;
+consensusCor[positive] = pmin(moduleTraitCor[[1]][positive], moduleTraitCor[[2]][positive]);
+consensusPvalue[positive] = pmax(moduleTraitPvalue[[1]][positive], moduleTraitPvalue[[2]][positive]);
+
+textMatrix = paste(signif(consensusCor, 2), "\n(",
+                   signif(consensusPvalue, 1), ")", sep = "");
+
+
+dim(textMatrix) = dim(moduleTraitCor[[set]])
+sizeGrWindow(10,7)
+#pdf(file = "Plots/ModuleTraitRelationships-consensus.pdf", wi = 10, he = 7);
+par(mar = c(6, 8.8, 3, 2.2));
+labeledHeatmap(Matrix = consensusCor,
+               xLabels = names(Traits[[set]]$data),
+               yLabels = MEColorNames,
+               ySymbols = MEColorNames,
+               colorLabels = FALSE,
+               colors = greenWhiteRed(50),
+               textMatrix = textMatrix,
+               setStdMargins = FALSE,
+               cex.text = 0.5,
+               zlim = c(-1,1),
+               main = paste("Consensus module--trait relationships across\n",
+                            paste(setLabels, collapse = " and ")))
+```
+
+

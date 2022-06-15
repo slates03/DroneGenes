@@ -1,0 +1,187 @@
+---
+title: "05B_Brain_power_Net_WGCNA.rmd"
+author: "Garett Slater"
+date: "April 21 2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r knitr setup, include=FALSE,  eval=TRUE, echo=FALSE, warning=FALSE}
+library(knitr)
+knitr::opts_chunk$set(eval=TRUE, cache=FALSE, message=FALSE, warning=FALSE, 
+                      comment = "")
+```
+
+
+```{r data}
+library(WGCNA)
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+load(file = "B_datExpr.RData")
+```
+
+
+```{r echo=FALSE}
+####################
+# Choose a set of soft threshold parameters
+####################
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+powers = c(c(1:20), seq(from = 22, to=30, by=2))
+B_sft = pickSoftThreshold(B_datExpr, powerVector = powers, verbose = 5) 
+
+# Scale-free topology fit index as a function of the soft-thresholding power
+pdf(file = "2-Brain-sft.pdf", width = 9, height = 5);
+par(mfrow = c(1,2));
+cex1 = 0.9;
+
+plot(B_sft$fitIndices[,1], -sign(B_sft$fitIndices[,3])*B_sft$fitIndices[,2],
+     xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",type="n",
+     main = paste("Scale independence"));
+text(B_sft$fitIndices[,1], -sign(B_sft$fitIndices[,3])*B_sft$fitIndices[,2],
+     labels=powers,cex=cex1,col="red");
+
+# this line corresponds to using an R^2 cut-off of h
+abline(h=0.90,col="red") 
+
+# Mean connectivity as a function of the soft-thresholding power
+plot(B_sft$fitIndices[,1], B_sft$fitIndices[,5],
+     xlab="Soft Threshold (power)",ylab="Mean Connectivity", type="n",
+     main = paste("Mean connectivity")) 
+text(B_sft$fitIndices[,1], B_sft$fitIndices[,5], labels=powers, cex=cex1,col="red")
+dev.off()
+
+par(mfrow = c(1,2));
+cex1 = 0.9;
+
+plot(B_sft$fitIndices[,1], -sign(B_sft$fitIndices[,3])*B_sft$fitIndices[,2],
+     xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",type="n",
+     main = paste("Scale independence"));
+text(B_sft$fitIndices[,1], -sign(B_sft$fitIndices[,3])*B_sft$fitIndices[,2],
+     labels=powers,cex=cex1,col="red");
+
+# this line corresponds to using an R^2 cut-off of h
+abline(h=0.90,col="red") 
+
+# Mean connectivity as a function of the soft-thresholding power
+plot(B_sft$fitIndices[,1], B_sft$fitIndices[,5],
+     xlab="Soft Threshold (power)",ylab="Mean Connectivity", type="n",
+     main = paste("Mean connectivity")) 
+text(B_sft$fitIndices[,1], B_sft$fitIndices[,5], labels=powers, cex=cex1,col="red")
+```
+
+
+```{r echo=FALSE}
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+########################################
+##                                    ##       
+##     2. Network Construction        ##
+##                                    ## 
+########################################
+
+library(WGCNA)
+B_net = blockwiseModules(B_datExpr, power = 6,
+                         TOMType = "unsigned", networkType = "unsigned",
+                         minModuleSize = 30,pamStage = TRUE,
+                         reassignThreshold = 0, mergeCutHeight = 0.25,
+                         numericLabels = TRUE, pamRespectsDendro = TRUE,
+                         saveTOMs = TRUE,deepSplit = 2,
+                         saveTOMFileBase = "Brain_TOM",
+                         verbose = 3)
+
+
+# open a graphics window
+sizeGrWindow(12, 9)
+# Convert labels to colors for plotting
+B_mergedColors = labels2colors(B_net$colors)
+# Plot the dendrogram and the module colors underneath
+pdf(file = "4-Brain-module_tree.pdf", width = 8, height = 6);
+plotDendroAndColors(B_net$dendrograms[[1]], B_mergedColors[B_net$blockGenes[[1]]],
+                    "Module colors",
+                    dendroLabels = FALSE, hang = 0.03,
+                    addGuide = TRUE, guideHang = 0.05)
+dev.off()
+
+
+B_moduleLabels = B_net$colors
+B_moduleColors = labels2colors(B_net$colors)
+B_MEs = B_net$MEs;
+B_geneTree = B_net$dendrograms[[1]];
+save(B_MEs, B_moduleLabels, B_moduleColors, B_geneTree, B_net,B_mergedColors, B_sft,
+     file = "Brain-networkConstruction-auto.RData")
+
+plotDendroAndColors(B_net$dendrograms[[1]], B_mergedColors[B_net$blockGenes[[1]]],
+                    "Module colors",
+                    dendroLabels = FALSE, hang = 0.03,
+                    addGuide = TRUE, guideHang = 0.05)
+```
+
+```{r echo=FALSE}
+par(cex = 1.6);
+par(mar = c(0,4,2,0))
+plotDendroAndColors(B_net$dendrograms[[1]], B_mergedColors[B_net$blockGenes[[1]]],
+                    "Module colors",
+                    dendroLabels = FALSE, hang = 0.03,
+                    addGuide = TRUE, guideHang = 0.05)
+```
+
+```{r echo=FALSE}
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+# It is often interesting to study the relationships among the found modules.
+# One can use the eigengenes as representative profiles and quantify module similarity by eigengene correlation.
+
+# Calculate eigengenes
+
+B_MEList = moduleEigengenes(B_datExpr, B_moduleColors, excludeGrey = TRUE, softPower = 6)
+MEs_B_plot = B_MEList$eigengenes
+
+# Calculate dissimilarity of module eigengenes
+B_MEDiss = 1-cor(MEs_B_plot);
+
+# Cluster module eigengenes
+B_METree = hclust(as.dist(B_MEDiss), method = "average");
+
+# Plot the result
+
+sizeGrWindow(12,12);
+
+par(cex = 1.0)
+pdf(file = "Brain-eigengenes_cluster.pdf", width = 12, height = 9);
+plot(B_METree, main = "Clustering of module eigengenes D",
+     xlab = "", sub = "")
+dev.off()
+
+# export lists of genes within each module of D
+genes = colnames(B_datExpr)
+for(color in 0:max(B_net$colors)){
+  # save transcript ids in this module
+  write.table( genes[ B_net$colors == color ],
+               file=(paste("~/OneDrive/Manuscripts/GenesOfDrones/WGCNA/Module_B/",
+                           color,".txt",sep="")),sep="\t",row.names=F,col.names=F,quote=F )
+}
+
+
+# adjacency and connectivity
+
+B_adj = adjacency(B_datExpr,
+                  type = "unsigned",
+                  power = 6)
+
+save(B_adj, file = "B_adj.RData")
+load(file="B_adj.RData")
+
+# Calculates intramodular connectivity, i.e., connectivity of nodes to other nodes within the same module.
+B_Alldegrees = intramodularConnectivity(B_adj, B_moduleColors)
+write.csv(B_Alldegrees, file = "B_Alldegrees.csv")
+
+pdf(file = "Brain-eigengenes_cluster.pdf", width = 12, height = 9);
+plot(B_METree, main = "Clustering of module eigengenes D",
+     xlab = "", sub = "")
+```
+
+```{r echo=FALSE}
+
+par(cex = 1);
+par(mar = c(0,4,2,0))
+plot(B_METree, main = "Clustering of module eigengenes D",
+     xlab = "", sub = "")
+```

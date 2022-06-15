@@ -1,0 +1,339 @@
+---
+title: "12_Shared_Hub_Genes.rmd"
+author: "Garett Slater"
+date: "April 21 2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+```{r knitr setup, include=FALSE,  eval=TRUE, echo=FALSE, warning=FALSE}
+library(knitr)
+knitr::opts_chunk$set(eval=TRUE, cache=FALSE, message=FALSE, warning=FALSE, 
+                      comment = "")
+```
+
+```{r data}
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+# Display the current working directory
+getwd();
+
+library(pacman)
+p_load(readxl,dplyr,tidyverse,lme4,nadiv,MCMCglmm,QGglmm,ggpubr)
+
+
+#Upload Trait Files
+Sperm<-read_excel("~/OneDrive/Manuscripts/GenesOfDrones/Resources/Expression_Drone_Trait.xlsx",sheet="Sperm")
+Weight<-read_excel("~/OneDrive/Manuscripts/GenesOfDrones/Resources/Expression_Drone_Trait.xlsx",sheet="Weight")
+Morpho<-read_excel("~/OneDrive/Manuscripts/GenesOfDrones/Resources/Expression_Drone_Trait.xlsx",sheet="Morpho")
+ID<-read_excel("~/OneDrive/Manuscripts/GenesOfDrones/Resources/Expression_Drone_Trait.xlsx",sheet="ID")
+RFID_out<-read.csv("~/OneDrive/Manuscripts/GenesOfDrones/Resources/RFID_2020Final_out.csv")
+RFID_out<-merge(RFID_out,ID,by="UID")
+RFID_out$UTCTime_Final<- with(RFID_out, as.POSIXct(paste(UTCDate, UTCTime), format="%m/%d/%Y %H:%M:%OS"))
+var_out<-RFID_out %>% group_by(UID) %>% dplyr::summarise(N_flights=length(flight),mean_flight_timediff=mean(timediff)/60,first_flight_age=min(Drone_Age))
+load(file="T_datExpr.RData")
+load(file="B_datExpr.RData")
+
+
+```
+
+# Shared Between Turquoise Brain and Testes
+
+```{r echo=FALSE}
+MM_T<-read.csv("~/OneDrive/Manuscripts/GenesofDrones/WGCNA/MM_T.csv")
+colnames(MM_T)[1]<-"GB"
+
+Turquoise<-read.table("~/OneDrive/Manuscripts/GenesofDrones/WGCNA/Module_T/1.txt")
+colnames(Turquoise)[1]<-"GB"
+Turquoise_con<-MM_T[,c(1,2)]
+###Get Connectivity
+Turquoise_f<-merge(Turquoise,Turquoise_con)
+Turquoise_f<-Turquoise_f[which(Turquoise_f$MM.1>0.9),]
+Turquoise_f$Module<-"Turquoise"
+Turquoise_f$Trait<-"Sperm"
+colnames(Turquoise_f)[2]<-"connectivity"
+
+
+#Connectivity Brain Module
+MM_B<-read.csv("~/OneDrive/Manuscripts/GenesofDrones/WGCNA/MM_B.csv")
+colnames(MM_B)[1]<-"GB"
+
+Turquoise_2<-read.table("~/OneDrive/Manuscripts/GenesofDrones/WGCNA/Module_B/1.txt")
+colnames(Turquoise_2)[1]<-"GB"
+Turquoise_2_con<-MM_B[,c(1,14)]
+###Get Connectivity
+Turquoise_2_f<-merge(Turquoise_2,Turquoise_2_con)
+Turquoise_2_f<-Turquoise_2_f[which(Turquoise_2_f$MM.1>0.9),]
+Turquoise_2_f$Module<-"Turquoise_2"
+Turquoise_2_f$Trait<-"Maturity"
+colnames(Turquoise_2_f)[2]<-"connectivity"
+
+shared<-merge(Turquoise_2_f,Turquoise_f,by="GB")
+```
+
+
+# GB49757 -
+```{r echo=FALSE}
+#Testes
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+x<-as.data.frame(T_datExpr)
+Hub1_Red<-dplyr::select(x,"GB49757")
+colnames(Hub1_Red)<-"Exp_T"
+Hub1_Red$ID2<-rownames(Hub1_Red)
+Hub1_Red<-merge(Hub1_Red,SampleT[,c("ID","ID2","phen_age")],by="ID2")
+Hub1_Red$phen_age<-as.character(Hub1_Red$phen_age)
+
+ff<-Hub1_Red%>%group_by(phen_age)%>% dplyr::summarise(mean=mean(Exp_T),sd=sd(Exp_T),N=length(Exp_T),se=sd/sqrt(N))
+ff$phen_age<-as.character(ff$phen_age)
+
+two.way <- aov(Exp_T ~ phen_age, data = Hub1_Red)
+summary(two.way)
+TukeyHSD(two.way)
+
+#Brain
+x<-as.data.frame(B_datExpr)
+Hub1_Red_B<-dplyr::select(x,"GB49757")
+colnames(Hub1_Red_B)<-"Exp_B"
+Hub1_Red_B$ID2<-rownames(Hub1_Red_B)
+Hub1_Red_B<-merge(Hub1_Red_B,SampleB[,c("ID","ID2","phen_age")],by="ID2")
+Hub1_Red_B$phen_age<-as.character(Hub1_Red_B$phen_age)
+ff2<-Hub1_Red_B%>%group_by(phen_age)%>% dplyr::summarise(mean=mean(Exp_B),sd=sd(Exp_B),N=length(Exp_B),se=sd/sqrt(N))
+ff2$phen_age<-as.character(ff2$phen_age)
+
+two.way <- aov(Exp_B ~ phen_age, data = Hub1_Red_B)
+summary(two.way)
+TukeyHSD(two.way)
+
+
+pdf(file = "TurquoiseSharedHubs_Top2_GB49757.pdf", width = 12, height = 9);
+sp<-ggplot(data=ff, aes(x=phen_age, y=mean)) +
+  geom_line(position=position_dodge(.2))+
+  geom_point(position=position_dodge(.2)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0,position=position_dodge(.2)) +
+  xlab("Age") +
+  ylab("fPKM") +
+  ggtitle("GB49757")+
+  scale_colour_hue(name="Tissue Type", l=40) + 
+  theme_classic() + theme(axis.ticks.x = element_blank(),
+                          axis.title.x = element_blank(),
+                          axis.text.x   = element_text(size=10, color="black"),
+                          axis.title.y  = element_text(face="bold", size=12),
+                          axis.text.y   = element_text(size=10, color="black"),
+                          legend.background = element_rect(size=0.5, linetype="solid",colour ="black"))
+
+sp2<-ggplot(data=ff2, aes(x=phen_age, y=mean)) +
+  geom_line(position=position_dodge(.2))+
+  geom_point(position=position_dodge(.2)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0,position=position_dodge(.2)) +
+  xlab("Age") +
+  ylab("fPKM") +
+  ggtitle("GB49757")+
+  scale_colour_hue(name="Tissue Type", l=40) + 
+  theme_classic() + theme(axis.ticks.x = element_blank(),
+                          axis.title.x = element_blank(),
+                          axis.text.x   = element_text(size=10, color="black"),
+                          axis.title.y  = element_text(face="bold", size=12),
+                          axis.text.y   = element_text(size=10, color="black"),
+                          legend.background = element_rect(size=0.5, linetype="solid",colour ="black"))
+
+ggarrange(sp, sp2, ncol = 2, nrow = 1)
+dev.off()
+ggarrange(sp, sp2, ncol = 2, nrow = 1)
+```
+
+
+# Shared Between Turquoise Brain (Flight and Maturity) and Turquoise Testes (Sperm)
+
+```{r echo=FALSE}
+#Sperm Analysis
+Sperm_1<-merge(ID,Sperm,all="TRUE")
+Sperm_1<-select(Sperm_1,"ID","Sperm_Conc_2","Sperm_viability","Maturity","phen_age")
+Sperm_1[is.na(Sperm_1)] <- 0
+
+Hub1_sperm<-merge(Sperm_1,Hub1_Red_B,by=c("ID","phen_age"))
+Hub1_sperm$phen_age<-as.character(Hub1_sperm$phen_age)
+Hub1_sperm<-Hub1_sperm[which(Hub1_sperm$Sperm_Conc_2<15),]
+Hub1_sperm<-Hub1_sperm[which(Hub1_sperm$phen_age!="2"),]
+Hub1_sperm$Maturity<-as.numeric(c("NM" = "0", "M" = "1")[Hub1_sperm$Maturity])
+Hub1_sperm$Maturity<-as.character(Hub1_sperm$Maturity)
+
+#Sperm Concentration
+sp<-ggplot(Hub1_sperm,aes(Sperm_Conc_2,Exp_B)) +
+  geom_point(size=2.5) +
+  geom_smooth(method='lm',size=2,color="black") +theme_classic2()+
+  xlab("Sperm Concentration") +
+  ylab("fPKM-Brain") +
+  ggtitle("GB49757")
+
+#Flight Analysis
+Hub1_flight<-merge(flight_1,Hub1_Red_B,by=c("ID","phen_age"))
+Hub1<-Hub1_flight[which(Hub1_flight$phen_age!="2"),]
+Hub1<-Hub1[which(Hub1$mean_flight_timediff<100),]
+Hub1$phen_age<-as.character(Hub1$phen_age)
+Hub1<-Hub1[which(Hub1$N_flights<40),]
+
+ggplot(Hub1,aes(first_flight_age,Exp_B)) +
+  geom_point(size=2.5) +
+  geom_smooth(method='lm',size=2,color="black") +theme_classic2() +
+  xlab("Number of Flights") +
+  ylab("fPKM-Brain") +
+  ggtitle("GB49757")
+
+
+two.way <- aov(Exp_B ~ first_flight_age, data = Hub1)
+summary(two.way)
+TukeyHSD(two.way)
+
+
+pdf(file = "Pleiotropic_Brain_Testes_GB45042.pdf", width = 12, height = 9);
+ggarrange(sp, sp2, ncol = 2, nrow = 1)
+dev.off()
+ggarrange(sp, sp2, ncol = 2, nrow = 1)
+```
+
+
+
+
+# Shared Between LightGreen Brain (Flight and Maturity) and Turquoise Testes (Sperm)
+
+```{r echo=FALSE}
+MM_T<-read.csv("~/OneDrive/Manuscripts/GenesofDrones/WGCNA/MM_T.csv")
+colnames(MM_T)[1]<-"GB"
+
+Turquoise-read.table("~/OneDrive/Manuscripts/GenesofDrones/WGCNA/Module_T/1.txt")
+colnames(Turquoise)[1]<-"GB"
+
+lightgreen<-read.table("~/OneDrive/Manuscripts/GenesofDrones/WGCNA/Module_B/18.txt")
+colnames(lightgreen)[1]<-"GB"
+
+shared<-merge(Turquoise,lightgreen)
+
+
+```
+
+Shared Genes
+- GB41082
+- GB42781
+- GB42845
+- GB45042
+- GB46120
+- GB48172
+
+
+# GB49757 -Pleiotropic Sperm/Flight Brain/Testes by Age
+```{r echo=FALSE}
+#Testes
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+x<-as.data.frame(T_datExpr)
+Hub1_Red<-dplyr::select(x,"GB49757")
+colnames(Hub1_Red)<-"Exp_T"
+Hub1_Red$ID2<-rownames(Hub1_Red)
+Hub1_Red<-merge(Hub1_Red,SampleT[,c("ID","ID2","phen_age")],by="ID2")
+Hub1_Red$phen_age<-as.character(Hub1_Red$phen_age)
+
+ff<-Hub1_Red%>%group_by(phen_age)%>% dplyr::summarise(mean=mean(Exp_T),sd=sd(Exp_T),N=length(Exp_T),se=sd/sqrt(N))
+ff$phen_age<-as.character(ff$phen_age)
+
+two.way <- aov(Exp_T ~ phen_age, data = Hub1_Red)
+summary(two.way)
+TukeyHSD(two.way)
+
+#Brain
+x<-as.data.frame(B_datExpr)
+Hub1_Red_B<-dplyr::select(x,"GB49757")
+colnames(Hub1_Red_B)<-"Exp_B"
+Hub1_Red_B$ID2<-rownames(Hub1_Red_B)
+Hub1_Red_B<-merge(Hub1_Red_B,SampleB[,c("ID","ID2","phen_age")],by="ID2")
+Hub1_Red_B$phen_age<-as.character(Hub1_Red_B$phen_age)
+ff2<-Hub1_Red_B%>%group_by(phen_age)%>% dplyr::summarise(mean=mean(Exp_B),sd=sd(Exp_B),N=length(Exp_B),se=sd/sqrt(N))
+ff2$phen_age<-as.character(ff2$phen_age)
+
+two.way <- aov(Exp_B ~ phen_age, data = Hub1_Red_B)
+summary(two.way)
+TukeyHSD(two.way)
+
+pdf(file = "SharedHubs_GB49757.pdf", width = 12, height = 9);
+sp<-ggplot(data=ff, aes(x=phen_age, y=mean)) +
+  geom_line(position=position_dodge(.2))+
+  geom_point(position=position_dodge(.2)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0,position=position_dodge(.2)) +
+  xlab("Age") +
+  ylab("fPKM") +
+  ggtitle("GB49757")+
+  scale_colour_hue(name="Tissue Type", l=40) + 
+  theme_classic() + theme(axis.ticks.x = element_blank(),
+                          axis.title.x = element_blank(),
+                          axis.text.x   = element_text(size=10, color="black"),
+                          axis.title.y  = element_text(face="bold", size=12),
+                          axis.text.y   = element_text(size=10, color="black"),
+                          legend.background = element_rect(size=0.5, linetype="solid",colour ="black"))
+
+sp2<-ggplot(data=ff2, aes(x=phen_age, y=mean)) +
+  geom_line(position=position_dodge(.2))+
+  geom_point(position=position_dodge(.2)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0,position=position_dodge(.2)) +
+  xlab("Age") +
+  ylab("fPKM") +
+  ggtitle("GB49757")+
+  scale_colour_hue(name="Tissue Type", l=40) + 
+  theme_classic() + theme(axis.ticks.x = element_blank(),
+                          axis.title.x = element_blank(),
+                          axis.text.x   = element_text(size=10, color="black"),
+                          axis.title.y  = element_text(face="bold", size=12),
+                          axis.text.y   = element_text(size=10, color="black"),
+                          legend.background = element_rect(size=0.5, linetype="solid",colour ="black"))
+
+ggarrange(sp, sp2, ncol = 2, nrow = 1)
+dev.off()
+ggarrange(sp, sp2, ncol = 2, nrow = 1)
+```
+
+
+
+# GB49757 -Pleiotropic Sperm/Flight Trait Correlation
+```{r echo=FALSE}
+#Flight Analysis
+Hub1_flight<-merge(flight_1,Hub1_Red_B,by=c("ID","phen_age"))
+Hub1<-Hub1_flight[which(Hub1_flight$phen_age!="2"),]
+Hub1<-Hub1[which(Hub1$mean_flight_timediff<100),]
+Hub1$phen_age<-as.character(Hub1$phen_age)
+Hub1<-Hub1[which(Hub1$N_flights<40),]
+
+sp<-ggplot(Hub1,aes(N_flights,Exp_B)) +
+  geom_point(size=2.5) +
+  geom_smooth(method='lm',size=2,color="black") +theme_classic2() +
+  xlab("Number of Flights") +
+  ylab("fPKM-Brain") +
+  ggtitle("GB49757")
+
+model <- lm(N_flights~Exp_B*phen_age, data=Hub1)
+summary(model)
+
+#Sperm Analysis
+Sperm_1<-merge(ID,Sperm,all="TRUE")
+Sperm_1<-select(Sperm_1,"ID","Sperm_Conc_2","Sperm_viability","Maturity","phen_age")
+Sperm_1[is.na(Sperm_1)] <- 0
+
+Hub1_sperm<-merge(Sperm_1,Hub1_Red_B,by=c("ID","phen_age"))
+Hub1_sperm$phen_age<-as.character(Hub1_sperm$phen_age)
+Hub1_sperm<-Hub1_sperm[which(Hub1_sperm$Sperm_Conc_2<10),]
+#Hub1_sperm<-Hub1_sperm[which(Hub1_sperm$phen_age!="20"),]
+
+
+sp2<-ggplot(Hub1_sperm,aes(Sperm_Conc_2,Exp_T)) +
+  geom_point(size=2.5) +
+  geom_smooth(method='lm',size=2,color="black") +theme_classic2()+
+  xlab("Sperm Concentration") +
+  ylab("fPKM-Brain") +
+  ggtitle("GB49757")
+
+
+model <- lm(Sperm_Conc_2 ~ Exp_B, data=Hub1_sperm)
+summary(model)
+
+pdf(file = "Pleiotropic_Brain_Testes_GB45042.pdf", width = 12, height = 9);
+ggarrange(sp, sp2, ncol = 2, nrow = 1)
+dev.off()
+ggarrange(sp, sp2, ncol = 2, nrow = 1)
+```
