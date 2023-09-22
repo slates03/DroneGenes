@@ -9,10 +9,10 @@ Drones were collected at ages 10, 14, and 20. A previous study found sperm conce
 This code was for the Tag-seq processing. First, Kallisto (v0.45) was used to quantify transcript abundance from our Tag-seq dataset (Bray et al. 2016). Pseudoalignments were completed using the latest version of the Apis mellifera transcriptome (Amel_HAv3.1; (Wallberg et al. 2019)), with an average fragment length of 100 bp and a standard deviation of fragment length of 20. Second, the count data was analyzed with DeSeq2 (Anders and Huber 2012), removing any gene with fewer than 10 read counts across all samples. The counts were then normalized using FPKM (Fragments Per Kilobase of transcript per Million mapped reads) for all downstream analysis. 
 
 ## 00-RFID Flight Processing
-Thi
-
+This code was used to filter and analyze raw RFID flight data for downstream analysis. Raw flight data is in Supplementary Table 6. 
 
 ## 01-Heritability
+This code was used to estimate heritability for drone reproductive traits and expression patterns. 
 
 ## 02-Radar Plot
 
