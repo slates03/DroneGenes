@@ -1,0 +1,101 @@
+---
+title: "06b_Brain_Module_Trait_Relationship.rmd"
+author: "Garett Slater"
+date: "April 21 2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+```{r knitr setup, include=FALSE,  eval=TRUE, echo=FALSE, warning=FALSE}
+library(knitr)
+knitr::opts_chunk$set(eval=TRUE, cache=FALSE, message=FALSE, warning=FALSE, 
+                      comment = "")
+```
+
+
+```{r echo=FALSE}
+library(WGCNA)
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+load(file="Brain-networkConstruction-auto.RData")
+load(file="B_datExpr.RData")
+load(file="B_adj.RData")
+```
+
+# Top Hub genes for each cluster
+```{r echo=FALSE}
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+
+# Top hub genes for each module:
+chooseTopHubInEachModule(
+  B_datExpr, 
+  B_moduleColors, 
+  power = 6, 
+  type = "unsigned")
+```
+- kTotal: the whole network connectivity (adjacency). Connectivity of the each gene based on its r-values to all other genes in the whole network
+- kWithin: the within module connectivity (intramodular connectivity). Connectivity of the each gene within a single module based on its r-values to all other genes within the same module
+- kOut=kTotal-kWithin
+- kDiff=kIn-kOut=2*kIN-kTotal
+
+```{r echo=FALSE}
+#Representing modules by eigengenes and relating eigengenes to one another
+##To  get  a  sense  of  how  related  the  modules  are  one  can  summarize  each  module  
+#by  its  eigengene  (first  principal component).
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+#Calculates module eigengenes (1st principal component) of modules in a given single dataset.
+B_datME = moduleEigengenes(B_datExpr, B_moduleLabels, softPower = 6)$eigengenes
+
+# significant digits (signif) to be used.
+datME_B_table = signif(cor(B_datME, use="p"), 2)
+write.csv(datME_B_table, file = "datME_B_table.csv")
+
+# Intramodular connectivity
+# Calculating the intramodular connectivity for each gene.  (In network literature, connectivity is often referred to as ”degree”)
+# The function intramodularConnectivity computes:
+#--> kTotal: the whole network connectivity (adjacency). Connectivity of the each gene based on its r-values to all other genes in the whole network
+#--> kWithin: the within module connectivity (intramodular connectivity). Connectivity of the each gene within a single module based on its r-values to all other genes within the same module
+#--> kOut=kTotal-kWithin
+#--> kDiff=kIn-kOut=2*kIN-kTotal
+
+
+#Calculates intramodular connectivity, i.e., connectivity of nodes to other nodes within the same module.
+Alldegrees_B_colors = intramodularConnectivity(B_adj, B_moduleColors)
+head(Alldegrees_B_colors)
+```
+
+# Generalizing intramodular connectivity for all genes on the array
+The intramodular connectivity measure is only defined for the genes inside a given module. 
+But in practice it can be very important to measure how connected a given genes is to biologically interesting modules. 
+A module eigengene-based connectivity measure for each gene as the correlation between a the gene expression and the module eigengene. In summary, how is the relationship between a gene and any module.
+```{r echo=FALSE}
+#Generalizing intramodular connectivity for all genes on the array
+##The intramodular connectivity measure is only defined for the genes inside a given module. 
+## But in practice it can be very important to measure how connected a given genes is to biologically interesting modules. 
+##A module eigengene-based connectivity measure for each gene as the correlation between a the gene expression and the module eigengene. In summary, how is the relationship between a gene and any module.
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+#output --> We have a module membership value for each gene in each module.
+load(file="B_datExpr.RData")
+load(file="Brain-networkConstruction-auto.RData")
+
+B_datKME = abs(signedKME(B_datExpr, B_MEs, outputColumnName="MM."))
+
+# Display the first few rows of the data frame
+
+head(B_datKME)
+write.csv(B_datKME, file = "MM_B.csv")
+```
+
+# Calculates module eigengenes (1st principal component) of modules in a given single dataset.
+
+```{r echo=FALSE}
+# Calculates module eigengenes (1st principal component) of modules in a given single dataset.
+datME_B_colors = moduleEigengenes(B_datExpr,B_moduleColors, softPower = 6)$eigengenes
+
+signif(cor(datME_B_colors, use="p"), 2)
+datKME_B_colors = abs(signedKME(B_datExpr, datME_B_colors, outputColumnName="MM."))
+head(datKME_B_colors)
+
+```
+

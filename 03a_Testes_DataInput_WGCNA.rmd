@@ -1,0 +1,134 @@
+---
+title: "03a_Testes_DataInput_WGCNA.rmd"
+author: "Garett Slater"
+date: "April 21 2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r knitr setup, include=FALSE,  eval=TRUE, echo=FALSE, warning=FALSE}
+library(knitr)
+knitr::opts_chunk$set(eval=TRUE, cache=FALSE, message=FALSE, warning=FALSE, 
+                      comment = "")
+```
+
+# Sample File
+I uploaded the tag-seq sample file, where
+
+- Name: TSV file output from Kallisto
+- ID2: ID with _T to represent testes tissues
+- ID: Drone collection ID
+
+```
+  Name               ID2   ID    Tissue
+1 C1_T_abundance.tsv C1_T  C1    Testes
+2 C2_T_abundance.tsv C2_T  C2    Testes
+3 C4_T_abundance.tsv C4_T  C4    Testes
+4 C5_T_abundance.tsv C5_T  C5    Testes
+5 C6_T_abundance.tsv C6_T  C6    Testes
+6 C7_T_abundance.tsv C7_T  C7    Testes
+```
+
+The tx2gene file is the the following format:
+
+```
+  target_id  protein_id
+1  gene-ND2 NP_008082.1
+2 gene-COX1 NP_008083.1
+3 gene-COX2 NP_008084.1
+4 gene-ATP8 NP_008085.1
+5 gene-ATP6 NP_008086.1
+6 gene-COX3 NP_008087.1
+```
+
+```{r data}
+library(pacman)
+p_load(GO.db, preprocessCore, impute,matrixStats,matrixStats, Hmisc, splines, foreach, doParallel, 
+       fastcluster, dynamicTreeCut, survival,mice, BiocManager,readxl,WGCNA,ggplot2,ggpubr,imputeTS,circlize,
+       fmsb,dplyr,tidyverse,biomaRt,tximport,DESeq2,GEOquery,ImpulseDE2,reshape2,UpSetR,plyranges,WGCNA,DESeq2)
+
+#Sample File and Filtering
+Sample<-read_excel("~/OneDrive/Manuscripts/GenesOfDrones/Resources/Expression_Drone_Trait.xlsx",sheet="Sample")
+SampleT<-Sample[which(Sample$Tissue=="Testes"),]
+#GB to Transcript File for Kallisto
+tx2gene=read.csv("~/OneDrive/Manuscripts/GenesOfDrones/Resources/GB_to_NCBI.csv")
+Sperm<-read_excel("~/OneDrive/Manuscripts/GenesOfDrones/Resources/Expression_Drone_Trait.xlsx",sheet="Sperm")
+ID<-read_excel("~/OneDrive/Manuscripts/GenesOfDrones/Resources/Expression_Drone_Trait.xlsx",sheet="ID")
+SampleT<-merge(SampleT,ID)
+SampleT<-SampleT%>%distinct(ID2,.keep_all = TRUE)
+```
+
+```{r echo=FALSE}
+####################
+# Expression and Normalized fpkm
+####################
+#Location with abundance files
+setwd("~/OneDrive/Manuscripts/GenesofDrones/Abundance/")
+
+#DESeq analysis with 
+files<-t(SampleT[,2:3])
+colnames(files)<-files[2,]
+files2<-files[1,]
+
+#Run Kallisto in R. I used Line as the design to account for line differences
+txi <- tximport(files2, type = "kallisto", tx2gene = tx2gene)
+dds <- DESeqDataSetFromTximport(txi, SampleT, design=~Line)
+
+#Change to normalized fpkm for downstream analysis
+T_fpkm_matrix = fpkm(dds)
+
+#Transpose the fpkm expression matrix
+T_datExpr<-t(T_fpkm_matrix)
+
+```
+
+```{r echo=FALSE}
+#Expression with testes with sperm data
+####################
+# Expression and Normalized fpkm
+####################
+#Location with abundance files
+setwd("~/OneDrive/Manuscripts/GenesofDrones/Abundance/")
+SampleT2<-merge(SampleT,Sperm)
+
+#DESeq analysis with 
+files<-t(SampleT2[,2:3])
+colnames(files)<-files[2,]
+files2<-files[1,]
+
+#Run Kallisto in R. I used Line as the design to account for line differences
+txi <- tximport(files2, type = "kallisto", tx2gene = tx2gene)
+dds <- DESeqDataSetFromTximport(txi, SampleT2, design=~Line)
+
+#Change to normalized fpkm for downstream analysis
+T2_fpkm_matrix = fpkm(dds)
+
+#Transpose the fpkm expression matrix
+T2_datExpr<-t(T2_fpkm_matrix)
+save(T2_datExpr,T2_fpkm_matrix, SampleT2, file = "T2_datExpr.RData")
+```
+
+```{r echo=FALSE}
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+####################
+# Sample Clustering Tree for outliers
+####################
+#Next we cluster the samples (in contrast to clustering genes that will come later) to see if there are any obvious outliers
+
+sampleTree = hclust(dist(T_datExpr), method = "average");
+# plot sample tree
+pdf(file = "1-Testes-sampleClustering.pdf", width = 12, height = 9);
+par(cex = 1.6);
+par(mar = c(0,4,2,0))
+plot(sampleTree, main = "Sample clustering to detect outliers", sub="", xlab="",
+     cex.lab = 1.5,cex.axis = 1.5, cex.main = 2)
+dev.off()
+
+par(cex = 1.6);
+par(mar = c(0,4,2,0))
+plot(sampleTree, main = "Sample clustering to detect outliers", sub="", xlab="",
+     cex.lab = 1.5,cex.axis = 1.5, cex.main = 2)
+
+save(T_datExpr,T_fpkm_matrix, SampleT, file = "T_datExpr.RData")
+```

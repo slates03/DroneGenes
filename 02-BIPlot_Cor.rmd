@@ -1,0 +1,87 @@
+---
+title: "02-BIPlot_Cor.md"
+author: "Garett Slater"
+date: "April 21 2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r knitr setup, include=FALSE,  eval=TRUE, echo=FALSE, warning=FALSE}
+library(knitr)
+knitr::opts_chunk$set(eval=TRUE, cache=FALSE, message=FALSE, warning=FALSE, 
+                      comment = "")
+```
+
+# Input Data
+```{r data}
+
+# Display the current working directory
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+
+library(pacman)
+p_load(readxl,dplyr,tidyverse,lme4,fmsb,factoextra)
+
+#Upload Trait Files
+Sample<-read_excel("~/OneDrive/Manuscripts/GenesOfDrones/Resources/Expression_Drone_Trait.xlsx",sheet="Sample")
+Sperm<-read_excel("~/OneDrive/Manuscripts/GenesOfDrones/Resources/Expression_Drone_Trait.xlsx",sheet="Sperm")
+Weight<-read_excel("~/OneDrive/Manuscripts/GenesOfDrones/Resources/Expression_Drone_Trait.xlsx",sheet="Weight")
+Morpho<-read_excel("~/OneDrive/Manuscripts/GenesOfDrones/Resources/Expression_Drone_Trait.xlsx",sheet="Morpho")
+ID<-read_excel("~/OneDrive/Manuscripts/GenesOfDrones/Resources/Expression_Drone_Trait.xlsx",sheet="ID")
+tx2gene<-read.csv("~/OneDrive/Manuscripts/GenesOfDrones/Resources/AMEL_tx2gene.csv")
+RFID_out<-read.csv("~/OneDrive/Manuscripts/GenesOfDrones/Resources/RFID_2020Final_out.csv")
+
+#Summarized Flight Trait data
+RFID_out<-merge(RFID_out,ID,by="UID")
+RFID_out$UTCTime_Final<- with(RFID_out, as.POSIXct(paste(UTCDate, UTCTime), format="%m/%d/%Y %H:%M:%OS"))
+var_out<-RFID_out %>% group_by(UID) %>% dplyr::summarise(N_flights=length(flight),mean_flight_timediff=mean(timediff)/60,first_flight_age=min(Drone_Age))
+```
+
+
+
+```{r echo=FALSE}
+setwd("~/OneDrive/Manuscripts/GenesofDrones/WGCNA")
+#Merge files together
+BP<-merge(Sperm,ID)
+BP<-merge(BP,Weight)
+BP<-merge(BP,var_out)
+BP<-merge(BP,Morpho)
+BP<-BP[which(BP$Age==14),]
+BP<-BP%>%select("ID","Line","Sperm_Conc_2","Sperm_viability","Weight","mean_flight_timediff","first_flight_age","basitarsus_length","frontwing_width")
+
+
+#Mature
+BP2<-merge(var_out,Weight)
+BP2<-merge(BP2,Morpho)
+BP2<-merge(BP2,ID)
+BP2<-BP2[which(BP2$phen_age==14),]
+BP2<-BP2%>%select("ID","Line","Weight","Maturity","mean_flight_timediff","first_flight_age","basitarsus_length","frontwing_width")
+BP2$Maturity<-as.numeric(c("NM" = "0", "M" = "1")[BP2$Maturity])
+
+cor(BP2[,3:8])
+cor.test(BP2$frontwing_width,BP2$Maturity)
+
+#Stats
+two.way <- aov(mean_flight_timediff~ Maturity, data = BP2)
+summary(two.way)
+
+BP2%>%group_by(Maturity)%>%summarize(mean=mean(mean_flight_timediff),sd=sd(mean_flight_timediff),N=length(mean_flight_timediff),se=sd/sqrt(N))
+
+#Principal Component Analysis
+pdf(file = "Trait_PCA_Biplot.pdf", width = 12, height = 9);
+res.pca <- prcomp(data.frame(BP[,-c(1:2)]), scale = TRUE)
+fviz_pca_var(res.pca,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE)
+dev.off()
+
+res.pca <- prcomp(data.frame(BP[,-c(1:2)]), scale = TRUE)
+fviz_eig(res.pca)
+fviz_pca_var(res.pca,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE)
+
+cor(BP[,3:9])
+```
