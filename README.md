@@ -36,9 +36,6 @@ This code was used for additional connectivity analysis along with Hub gene iden
 ## 07-Data input for consensus module (See HTML for output)
 This code was used to input brain and gonad data for consensus module.
 
-## 07-Data input for consensus module (See HTML for output)
-This code was used to input brain and gonad data for consensus module.
-
 ## 08-Consensus Power and Network construction
 We have chosen the soft thresholding power 6, minimum module size 30, the module detection sensitivity deepSplit
 2, cut height for merging of modules 0.20 (implying that modules whose eigengenes are correlated above 1 −0.2 =
