@@ -1,6 +1,7 @@
 library(pacman)
 p_load(readxl,dplyr,tidyverse,lme4,nadiv,MCMCglmm,QGglmm)
 
+setwd("~/OneDrive/Manuscripts/GenesOfDrones/Writing/Final")
 #LOAD FILES
 Pedigree <- data.frame(read_excel("Supplementary_Table6.xlsx",sheet="Pedigree"))
 Sperm <- read_excel("Supplementary_Table6.xlsx",sheet="Drone_Sperm")
@@ -170,11 +171,8 @@ model <- MCMCglmm(weight ~ Phen_age + Line + Colony,
 summary(model)
 
 
-mean((model[["VCV"]][ , "Drone_ID"] + model[["VCV"]][ , "units"]))
-
-
 herit <-
-  model[["VCV"]][ , "Drone_ID"] / (model[["VCV"]][ , "Drone_ID"] + model[["VCV"]][ , "units"])
+  ((model[["VCV"]][ , "Drone_ID"])/2) / ((model[["VCV"]][ , "Drone_ID"] + model[["VCV"]][ , "units"])/2)
 
 mean(herit)
 HPDinterval(herit)
@@ -208,7 +206,7 @@ model <- MCMCglmm(basitarsus_length ~ Phen_age + Line + Colony,
 summary(model)
 
 herit <-
-  model[["VCV"]][ , "Drone_ID"] / (model[["VCV"]][ , "Drone_ID"] + model[["VCV"]][ , "units"])
+  ((model[["VCV"]][ , "Drone_ID"])/2) / ((model[["VCV"]][ , "Drone_ID"] + model[["VCV"]][ , "units"])/2)
 
 mean(herit)
 HPDinterval(herit)
@@ -242,10 +240,11 @@ model <- MCMCglmm(frontwing_width ~ Phen_age + Line + Colony,
 summary(model)
 
 herit <-
-  model[["VCV"]][ , "Drone_ID"] / (model[["VCV"]][ , "Drone_ID"] + model[["VCV"]][ , "units"])
+  ((model[["VCV"]][ , "Drone_ID"])/2) / ((model[["VCV"]][ , "Drone_ID"] + model[["VCV"]][ , "units"])/2)
 
 mean(herit)
 HPDinterval(herit)
+
 
 
 #######################
